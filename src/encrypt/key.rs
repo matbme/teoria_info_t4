@@ -13,6 +13,9 @@ impl KeyScheduler {
         Self { master_key, num_subkeys, subkeys }
     }
 
+    /// Basic sub-key generation. Each sub-key is a byte-wise XOR between the
+    /// last sub-key (or the master key if generating the first sub-key) and the
+    /// generated key number (between 1 and num_subkeys)
     fn gen_keys(master_key: &Vec<u8>, num_subkeys: usize) -> Vec<Vec<u8>> {
         let mut ret: Vec<Vec<u8>> = Vec::new();
 
