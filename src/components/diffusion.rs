@@ -18,19 +18,34 @@ pub fn block_to_matrix(block: &[u8; 48]) -> [[[u8; 5]; 5]; 2] {
 
     // Let m be each matrix, m[4][4] corresponds to a XOR between
     // sum([4][..]) and sum([..][4])
-    let row: [u8; 5] = ret[0][4];
-    let col: [u8; 5] = ret[0].map(|r| r[4]);
-    ret[0][4][4] = xor_arr(&row) ^ xor_arr(&col);
-
-    let row: [u8; 5] = ret[1][4];
-    let col: [u8; 5] = ret[1].map(|r| r[4]);
-    ret[1][4][4] = xor_arr(&row) ^ xor_arr(&col);
+    // let row: [u8; 5] = ret[0][4];
+    // let col: [u8; 5] = ret[0].map(|r| r[4]);
+    // ret[0][4][4] = xor_arr(&row) ^ xor_arr(&col);
+    //
+    // let row: [u8; 5] = ret[1][4];
+    // let col: [u8; 5] = ret[1].map(|r| r[4]);
+    // ret[1][4][4] = xor_arr(&row) ^ xor_arr(&col);
 
     // Applies row shift to both matrices
-    apply_row_shift(&mut ret[0]);
-    apply_row_shift(&mut ret[1]);
+    apply_left_row_shift(&mut ret[0]);
+    apply_left_row_shift(&mut ret[1]);
 
     ret
+}
+
+/// Inverse process of the function above
+pub fn matrix_to_block(mats: &[[[u8; 5]; 5]; 2], invert: bool) -> [u8; 48] {
+    // Joins matrix into a 1D vector
+    let mut lhs = mats[0].concat();
+    let mut rhs = mats[0].concat();
+
+    // Removes the 0 byte we added when transforming into a matrix
+    lhs.remove(20);
+    rhs.remove(20);
+
+    (if invert { [rhs, lhs].concat() } 
+        else { [lhs, rhs].concat() }
+    ).try_into().unwrap()
 }
 
 /// XOR's a 5 element array
@@ -46,7 +61,7 @@ fn xor_arr(arr: &[u8; 5]) -> u8 {
 
 
 /// Applies row shift for a 5x5 matrix
-fn apply_row_shift(mat: &mut [[u8; 5]; 5]) {
+fn apply_left_row_shift(mat: &mut [[u8; 5]; 5]) {
     for i in 0..mat.len() {
         let result = mat.get_mut(i);
         match result {
