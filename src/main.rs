@@ -3,18 +3,20 @@ pub mod components;
 use std::env;
 use std::fs;
 use crate::components::KeyScheduler;
-use crate::components::apply_sbox;
 use crate::components::block_to_matrix;
 use crate::components::matrix_to_block;
 
-fn encrypt(msg: &Vec<u8>, ks: &KeyScheduler) -> Vec<u8> {
+fn encrypt(msg: &[bool], ks: &KeyScheduler) -> Vec<bool> {
+    println!("{}", msg.len());
     // Division is guaranteed to be integer because of prior padding
    for i in 0..(msg.iter().len() / 48) {
-        let chunk: [u8; 48] = msg[..47].try_into().unwrap();
+        let chunk: [bool; 48] = msg[i*48..i*48+48].try_into().unwrap();
         let transformed = block_to_matrix(&chunk);
 
-        println!("{:?}", chunk);
-        println!("{:?}", matrix_to_block(&transformed, false));
+        // println!("{:?}", chunk);
+        // println!("{:?}", matrix_to_block(&transformed, false));
+        
+        assert_eq!(chunk, matrix_to_block(&transformed, false));
 
     }
 
@@ -50,7 +52,7 @@ fn main() {
         file_bits.push(false);
     }
 
-    block_to_matrix(&file_bytes[..48].try_into().unwrap());
+    block_to_matrix(&file_bits[..48].try_into().unwrap());
 
-    encrypt(&file_bytes, &ks);
+    encrypt(&file_bits[..], &ks);
 }
