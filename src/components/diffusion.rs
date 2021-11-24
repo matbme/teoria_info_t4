@@ -55,18 +55,6 @@ pub fn matrix_to_block(mats: &[[[bool; 5]; 5]; 2], invert: bool) -> [bool; 48] {
     ).try_into().unwrap()
 }
 
-/// XOR's a 5 element array
-fn xor_arr(arr: &[u8; 5]) -> u8 {
-    let mut ret: u8 = 0;
-
-    for elem in arr {
-        ret ^= elem;
-    }
-
-    ret
-}
-
-
 /// Applies row shift for a 5x5 matrix
 fn apply_left_row_shift(mat: &mut [[bool; 5]; 5]) {
     for i in 0..mat.len() {

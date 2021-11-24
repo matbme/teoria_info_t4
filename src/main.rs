@@ -2,9 +2,7 @@ pub mod components;
 
 use std::env;
 use std::fs;
-use crate::components::KeyScheduler;
-use crate::components::block_to_matrix;
-use crate::components::matrix_to_block;
+use crate::components::*;
 
 fn encrypt(msg: &[bool], ks: &KeyScheduler) -> Vec<bool> {
     println!("{}", msg.len());
@@ -13,6 +11,8 @@ fn encrypt(msg: &[bool], ks: &KeyScheduler) -> Vec<bool> {
         let chunk: [bool; 48] = msg[i*48..i*48+48].try_into().unwrap();
         let transformed = block_to_matrix(&chunk);
 
+
+        // s_box();
         // println!("{:?}", chunk);
         // println!("{:?}", matrix_to_block(&transformed, false));
         
@@ -52,7 +52,8 @@ fn main() {
         file_bits.push(false);
     }
 
-    block_to_matrix(&file_bits[..48].try_into().unwrap());
+    // block_to_matrix(&file_bits[..48].try_into().unwrap());
 
+    s_box(&0x53);
     encrypt(&file_bits[..], &ks);
 }
