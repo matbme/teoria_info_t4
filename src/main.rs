@@ -2,6 +2,8 @@ pub mod components;
 
 use std::env;
 use std::fs;
+use std::fs::File;
+use std::io::Write;
 use crate::components::*;
 
 fn cbc(msg: &[bool], last: &[bool]) -> [bool; 48] {
@@ -122,21 +124,11 @@ fn decrypt(msg: &[bool], ks: &KeyScheduler, iv: &[bool]) -> Vec<bool> {
 }
 
 fn main() {
-    let iv: [u8; 6] = [18, 83, 254, 123, 173, 164];
-
-    let mut iv_bool: [bool; 48] = [false; 48];
-    let mut count = 0;
-    for ch in iv {
-        for bit in bool::as_bitstream(&ch) {
-            iv_bool[count] = bit;
-            count += 1;
-        }
-    }
-
     // Initialize arguments passed by the CLI
     let args: Vec<String> = env::args().collect();
     let filename: &String = &args[1];
     let key: &String = &args[2];
+    let mode: &String = &args[3];
 
     // Load file into memory
     let mut file_bytes: Vec<u8> = fs::read(filename)
@@ -144,38 +136,94 @@ fn main() {
 
     file_bytes.pop();
 
-    // Convert to bitstream
-    let mut file_bits: Vec<bool> = Vec::new();
-    for byte in &file_bytes {
-        let mut bitstream: [bool; 8] = [false; 8];
-        for b in 0..8 {
-            bitstream[b] = (byte & (128 / (2 as u8).pow(b as u32))) != 0;
+    // Parses mode
+    if mode == "encrypt" {
+        let iv: [u8; 6] = [18, 83, 254, 123, 173, 164];
+
+        let mut iv_bool: [bool; 48] = [false; 48];
+        let mut count = 0;
+        for ch in iv {
+            for bit in bool::as_bitstream(&ch) {
+                iv_bool[count] = bit;
+                count += 1;
+            }
         }
-        file_bits.extend_from_slice(&bitstream[..]);
+
+        // Convert to bitstream
+        let mut file_bits: Vec<bool> = Vec::new();
+        for byte in &file_bytes {
+            let mut bitstream: [bool; 8] = [false; 8];
+            for b in 0..8 {
+                bitstream[b] = (byte & (128 / (2 as u8).pow(b as u32))) != 0;
+            }
+            file_bits.extend_from_slice(&bitstream[..]);
+        }
+
+        // Adds padding if needed
+        let pad = file_bits.len() % 48;
+        for _ in 0..pad {
+            file_bits.push(false);
+        }
+        
+        // Initialize key scheduler
+        let ks = KeyScheduler::new(String::clone(key), file_bits.len() / 48);
+
+
+        let enc_msg = encrypt(&file_bits[..], &ks, &iv_bool);
+
+        let mut enc_msg_bytes: Vec<u8> = Vec::new();
+        for byte in enc_msg.chunks(8) {
+            enc_msg_bytes.push(u8::from_bitstream(byte.try_into().unwrap()));
+        }
+
+
+        let mut file = File::create("encrypted.txt").unwrap();
+        file.write_all(&iv).expect("Falha ao escrever arquivo");
+        file.write_all(&enc_msg_bytes[..]).expect("Falha ao escrever arquivo");
+        file.write_all(&[10]).expect("Falha ao escrever arquivo");
     }
+    else if mode == "decrypt" {
+        let iv: [u8; 6] = file_bytes[..6].try_into().unwrap();
 
-    // Adds padding if needed
-    let pad = file_bits.len() % 48;
-    for _ in 0..pad {
-        file_bits.push(false);
+        let mut iv_bool: [bool; 48] = [false; 48];
+        let mut count = 0;
+        for ch in iv {
+            for bit in bool::as_bitstream(&ch) {
+                iv_bool[count] = bit;
+                count += 1;
+            }
+        }
+
+        // Convert to bitstream
+        let mut file_bits: Vec<bool> = Vec::new();
+        for byte in &file_bytes[6..] {
+            let mut bitstream: [bool; 8] = [false; 8];
+            for b in 0..8 {
+                bitstream[b] = (byte & (128 / (2 as u8).pow(b as u32))) != 0;
+            }
+            file_bits.extend_from_slice(&bitstream[..]);
+        }
+
+        // Adds padding if needed
+        let pad = file_bits.len() % 48;
+        for _ in 0..pad {
+            file_bits.push(false);
+        }
+
+        // Initialize key scheduler
+        let ks = KeyScheduler::new(String::clone(key), file_bits.len() / 48);
+
+        let dec_msg = decrypt(&file_bits[..], &ks, &iv_bool);
+
+        let mut dec_msg_bytes: Vec<u8> = Vec::new();
+        for byte in dec_msg.chunks(8) {
+            dec_msg_bytes.push(u8::from_bitstream(byte.try_into().unwrap()));
+        }
+        println!("{:?}", dec_msg_bytes);
+
+
+        let mut file = File::create("decrypted.txt").unwrap();
+        file.write_all(&dec_msg_bytes[..]).expect("Falha ao escrever arquivo");
+        file.write_all(&[10]).expect("Falha ao escrever arquivo");
     }
-
-    // Initialize key scheduler
-    let ks = KeyScheduler::new(String::clone(key), file_bits.len() / 48);
-
-    // Calls encryption
-    let enc_msg = encrypt(&file_bits[..], &ks, &iv_bool);
-    let dec_msg = decrypt(&enc_msg[..], &ks, &iv_bool);
-
-    // println!("{:?}", file_bits);
-
-    let mut dec_chars: Vec<u8> = Vec::new();
-    for byte in dec_msg.chunks(8) {
-        dec_chars.push(u8::from_bitstream(byte.try_into().unwrap()));
-    }
-
-    println!("{:?}", file_bytes);
-    println!("{:?}", dec_chars);
-
-    assert_eq!(file_bits, dec_msg);
 }
