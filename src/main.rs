@@ -4,15 +4,6 @@ use std::env;
 use std::fs;
 use crate::components::*;
 
-fn print_as_num(v: &[bool]) {
-    let mut dec_chars: Vec<u8> = Vec::new();
-    for byte in v.chunks(8) {
-        dec_chars.push(u8::from_bitstream(byte.try_into().unwrap()));
-    }
-
-    println!("{:?}", dec_chars);
-}
-
 fn cbc(msg: &[bool], last: &[bool]) -> [bool; 48] {
     let mut ret: [bool; 48] = [false; 48];
 
@@ -30,7 +21,6 @@ fn encrypt(msg: &[bool], ks: &KeyScheduler, iv: &[bool]) -> Vec<bool> {
     for i in 0..rounds {
        // Gets a 48 bit chunk
         let chunk: [bool; 48] = msg[i*48..i*48+48].try_into().unwrap();
-        print_as_num(&chunk);
 
         // Mix with CBC
         let last_encryption = if i > 0 {
@@ -39,18 +29,14 @@ fn encrypt(msg: &[bool], ks: &KeyScheduler, iv: &[bool]) -> Vec<bool> {
             &iv
         };
         let mut chunk = cbc(&chunk, last_encryption);
-        print_as_num(&chunk);
 
         // XOR with round's subkey
         let round_key = ks.get_subkey(i);
         let round_key = round_key.map(|x| bool::as_bitstream(&x)).concat();
-        println!("{}", i);
-        print_as_num(&round_key);
 
         for (j, bit) in chunk.clone().iter().enumerate() {
             chunk[j] = bit ^ round_key[j];
         }
-        print_as_num(&chunk);
 
         // Apply s_box for each byte in chunk
         let mut boxed_chunk = [false; 48];
@@ -62,7 +48,6 @@ fn encrypt(msg: &[bool], ks: &KeyScheduler, iv: &[bool]) -> Vec<bool> {
                 boxed_chunk[j*8+k] = boxed[k];
             }
         }
-        print_as_num(&boxed_chunk);
 
         // Transforms chunk into two 5x5 matrices
         let mut transformed = block_to_matrix(&boxed_chunk, true);
@@ -70,8 +55,7 @@ fn encrypt(msg: &[bool], ks: &KeyScheduler, iv: &[bool]) -> Vec<bool> {
         apply_left_row_shift(&mut transformed[0]);
         apply_left_row_shift(&mut transformed[1]);
         // Transform back to block
-        let chunk = matrix_to_block(&transformed, false, true);
-        print_as_num(&chunk);
+        let chunk = matrix_to_block(&transformed,true);
 
         // Add chunk to return vector
         ret.extend_from_slice(&chunk[..]);
@@ -92,7 +76,6 @@ fn decrypt(msg: &[bool], ks: &KeyScheduler, iv: &[bool]) -> Vec<bool> {
     for i in 0..rounds {
         // Gets a 48 bit chunk
         let chunk: [bool; 48] = msg[i*48..i*48+48].try_into().unwrap();
-        print_as_num(&chunk);
 
         // Transforms chunk into two 5x5 matrices
         let mut transformed = block_to_matrix(&chunk, false);
@@ -100,8 +83,7 @@ fn decrypt(msg: &[bool], ks: &KeyScheduler, iv: &[bool]) -> Vec<bool> {
         apply_right_row_shift(&mut transformed[0]);
         apply_right_row_shift(&mut transformed[1]);
         // Transform back to block
-        let chunk = matrix_to_block(&transformed, false, false);
-        print_as_num(&chunk);
+        let chunk = matrix_to_block(&transformed, false);
 
         // Apply inverse s_box for each byte in chunk
         let mut boxed_chunk = [false; 48];
@@ -113,29 +95,24 @@ fn decrypt(msg: &[bool], ks: &KeyScheduler, iv: &[bool]) -> Vec<bool> {
                 boxed_chunk[j*8+k] = boxed[k];
             }
         }
-        print_as_num(&boxed_chunk);
 
         let mut chunk: [bool; 48] = boxed_chunk.clone();
 
         // XOR with round's subkey
         let round_key = ks.get_subkey(i);
         let round_key = round_key.map(|x| bool::as_bitstream(&x)).concat();
-        println!("{}", rounds - i - 1);
-        print_as_num(&round_key);
 
         for (j, bit) in chunk.clone().iter().enumerate() {
             chunk[j] = bit ^ round_key[j];
         }
-        print_as_num(&chunk);
 
-        // // Unmix with CBC
+        // Unmix with CBC
         let last_encryption = if i > 0 {
             &msg[(i-1)*48..(i-1)*48+48]
         } else {
             &iv
         };
         let chunk = cbc(&chunk, last_encryption);
-        print_as_num(&chunk);
 
         // Add chunk to return vector
         ret.extend_from_slice(&chunk[..]);

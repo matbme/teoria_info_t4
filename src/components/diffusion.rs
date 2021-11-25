@@ -16,12 +16,14 @@ pub fn block_to_matrix(block: &[bool; 48], encrypt: bool) -> [[[bool; 5]; 5]; 2]
         i += 1;
     }
 
-    // if !encrypt {
-    //     ret[0][4][0] = ret[0][4][4];
-    //     ret[0][4][4] = false;
-    //     ret[1][4][0] = ret[0][4][4];
-    //     ret[1][4][4] = false;
-    // }
+    if !encrypt {
+        ret[0][4].rotate_left(4);
+        ret[1][4].rotate_left(4);
+        // ret[0][4][4] = ret[0][4][0];
+        // ret[0][4][0] = false;
+        // ret[1][4][4] = ret[1][4][0];
+        // ret[1][4][0] = false;
+    }
 
     // Let m be each matrix, m[4][4] corresponds to a XOR between
     // sum([4][..]) and sum([..][4])
@@ -41,26 +43,30 @@ pub fn block_to_matrix(block: &[bool; 48], encrypt: bool) -> [[[bool; 5]; 5]; 2]
 }
 
 /// Inverse process of the function above
-pub fn matrix_to_block(mats: &[[[bool; 5]; 5]; 2], invert: bool, encrypt: bool) -> [bool; 48] {
+pub fn matrix_to_block(mats: &[[[bool; 5]; 5]; 2], encrypt: bool) -> [bool; 48] {
     let lhs = mats[0];
     let rhs = mats[1];
 
-    // Remove row shift
-    // apply_right_row_shift(&mut lhs);
-    // apply_right_row_shift(&mut rhs);
+    let mut ret: Vec<bool> = Vec::new();
 
-    // Joins matrix into a 1D vector
-    let mut lhs = lhs.concat();
-    let mut rhs = rhs.concat();
+    let pos = if encrypt { 20 } else { 24 };
+    for i in 0..5 {
+        for j in 0..5 {
+            if (i*5+j) != pos {
+                ret.push(lhs[i][j]);
+            }
+        }
+    }
 
-    // Removes the 0 byte we added when transforming into a matrix
-    let pos = if encrypt { 24 } else { 24 };
-    lhs.remove(pos);
-    rhs.remove(pos);
+    for i in 0..5 {
+        for j in 0..5 {
+            if (i*5+j) != pos {
+                ret.push(rhs[i][j]);
+            }
+        }
+    }
 
-    (if invert { [rhs, lhs].concat() } 
-        else { [lhs, rhs].concat() }
-    ).try_into().unwrap()
+    ret.try_into().unwrap()
 }
 
 /// Applies row shift for a 5x5 matrix
